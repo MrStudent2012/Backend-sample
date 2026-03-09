@@ -82,7 +82,7 @@ def _build_workloads(tasks: List[Dict[str, Any]]) -> List[MemberWorkload]:
     """Aggregate per-member statistics."""
     members: Dict[str, Dict[str, int]] = {}
     for task in tasks:
-        member = task["assignee"]                    # <-- can be None!
+        member = task.get("assignee") or "UNASSIGNED"                    # <-- can be None!
         members.setdefault(member, {"assigned": 0, "completed": 0, "in_progress": 0})
         members[member]["assigned"] += 1
         if task["status"] == TaskStatus.DONE.value:
@@ -148,7 +148,7 @@ def _format_report(
 
         # 🐛 BUG: task["assignee"] is None for unassigned tasks.
         #    .upper() on None → AttributeError
-        assignee_display = task["assignee"].upper()
+        assignee_display = (task.get("assignee") or "UNASSIGNED").upper()
 
         priority_tag = f'[{task["priority"].upper()}]'
         lines.append(
