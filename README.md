@@ -14,6 +14,7 @@ Open **http://localhost:8000/docs** for the interactive Swagger UI.
 
 ## Endpoints
 
+| POST | `/api/signup` | User registration |
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/` | Service info |
