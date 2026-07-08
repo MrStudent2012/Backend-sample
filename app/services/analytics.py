@@ -82,7 +82,7 @@ def _build_workloads(tasks: List[Dict[str, Any]]) -> List[MemberWorkload]:
     """Aggregate per-member statistics."""
     members: Dict[str, Dict[str, int]] = {}
     for task in tasks:
-        member = task.get("assignee") or "UNASSIGNED"                    # <-- can be None!
+        member = task.get("assignee") or "UNASSIGNED"
         members.setdefault(member, {"assigned": 0, "completed": 0, "in_progress": 0})
         members[member]["assigned"] += 1
         if task["status"] == TaskStatus.DONE.value:
@@ -112,15 +112,6 @@ def _compute_health_score(summary: TaskSummary) -> float:
     return round(score, 1)
 
 
-# ──────────────────────────────────────────────────────────────────────────
-#  BUG IS HERE 🐛
-#  `task["assignee"]` can be None for unassigned tasks.
-#  Calling `.upper()` on None raises:
-#      AttributeError: 'NoneType' object has no attribute 'upper'
-#
-#  FIX: guard with `task["assignee"] or "Unassigned"`
-# ──────────────────────────────────────────────────────────────────────────
-
 def _format_report(
     project: Dict[str, Any],
     tasks: List[Dict[str, Any]],
@@ -146,8 +137,6 @@ def _format_report(
             TaskStatus.DONE.value: "✔",
         }.get(task["status"], "?")
 
-        # 🐛 BUG: task["assignee"] is None for unassigned tasks.
-        #    .upper() on None → AttributeError
         assignee_display = (task.get("assignee") or "UNASSIGNED").upper()
 
         priority_tag = f'[{task["priority"].upper()}]'
