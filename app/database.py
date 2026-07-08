@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from .models import Priority, TaskStatus
+from .models import UserInDB
 
 
 # ---------------------------------------------------------------------------
@@ -18,8 +19,10 @@ from .models import Priority, TaskStatus
 
 _projects: Dict[int, Dict[str, Any]] = {}
 _tasks: Dict[int, Dict[str, Any]] = {}
+_users: Dict[int, Dict[str, Any]] = {}
 _next_project_id: int = 1
 _next_task_id: int = 1
+_next_user_id: int = 1
 
 
 # ---------------------------------------------------------------------------
@@ -184,3 +187,36 @@ def delete_task(task_id: int) -> bool:
         del _tasks[task_id]
         return True
     return False
+
+
+# ---------------------------------------------------------------------------
+# User CRUD
+# ---------------------------------------------------------------------------
+
+def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
+    """Retrieve a user by their username."""
+    for user_data in _users.values():
+        if user_data["username"] == username:
+            return user_data
+    return None
+
+
+def create_user(username: str, hashed_password: str) -> Dict[str, Any]:
+    """Create a new user record in the database."""
+    global _next_user_id
+    now = datetime.utcnow()
+    user_data = UserInDB(
+        id=_next_user_id,
+        username=username,
+        hashed_password=hashed_password,
+        created_at=now,
+    ).model_dump()
+    
+    _users[_next_user_id] = user_data
+    _next_user_id += 1
+    return user_data
+
+
+def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """Retrieve a user by their ID."""
+    return _users.get(user_id)
