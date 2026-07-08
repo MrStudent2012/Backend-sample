@@ -91,6 +91,28 @@ class Project(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# User models
+# ---------------------------------------------------------------------------
+
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=8)
+
+
+class UserInDB(BaseModel):
+    id: int
+    username: str
+    hashed_password: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
 # Analytics / Health models
 # ---------------------------------------------------------------------------
 
