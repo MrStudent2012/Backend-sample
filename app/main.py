@@ -15,6 +15,7 @@ from .database import seed_database
 from .models import ProjectHealth
 from .routes.projects import router as projects_router
 from .routes.tasks import router as tasks_router
+from .routes.auth import router as auth_router
 from .services.analytics import calculate_project_health
 
 
@@ -49,6 +50,7 @@ app.add_middleware(
 # ---- Routers ----
 app.include_router(projects_router)
 app.include_router(tasks_router)
+app.include_router(auth_router)
 
 
 # ---- Analytics endpoint (triggers the bug) ----
