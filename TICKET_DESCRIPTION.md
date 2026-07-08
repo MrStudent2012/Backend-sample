@@ -6,118 +6,167 @@
 ---
 
 ## Ticket ID
-**TASKFLOW-142**
+**TASKFLOW-143**
 
 ## Title
-`GET /api/projects/{id}/health` returns 500 — AttributeError on unassigned tasks
+Implement User Signup with Basic User Record Creation
 
 ## Type
-Bug
+Feature
 
 ## Priority
-High
+Medium
 
 ## Component
-`taskflow-api` / Analytics Service
+`taskflow-api` / User Management
 
 ## Environment
 - **Service**: TaskFlow API v1.2.0
 - **Runtime**: Python 3.11 / FastAPI 0.110
 - **OS**: Ubuntu 22.04 (Render.com web service)
-- **Endpoint**: `GET /api/projects/1/health`
+- **Endpoint**: `POST /api/users/` (to be created)
 
 ## Description
 
-The project health endpoint crashes with an **`AttributeError`** whenever the
-target project contains one or more **unassigned tasks** (i.e. tasks where
-`assignee` is `null`).
+Implement a signup feature that creates a new user record when a user successfully registers in our backend-sample service.
 
-The endpoint works fine for projects where every task has an assignee, but
-Project 1 ("TaskFlow Backend") has two unassigned tasks — "Add rate limiting"
-and "Database migration script" — and any call to its health report fails.
+### Requirements
 
-### Reproduction Steps
+- Create a new user record upon successful signup.
+- Store only the minimum required user information:
+  - Username
+  - Password (stored securely as a hashed value)
+  - Account creation timestamp
+- Ensure the username is unique.
+- Validate required fields before creating the user.
+- Return an appropriate success or error response based on the outcome.
 
-1. Start the API server:
-   ```
-   cd sample_app
-   uvicorn app.main:app --reload
-   ```
-2. Confirm seed data loaded:
-   ```
-   curl http://localhost:8000/api/tasks/?project_id=1
-   ```
-   → You will see tasks 3 and 5 have `"assignee": null`.
-3. Trigger the bug:
-   ```
-   curl http://localhost:8000/api/projects/1/health
-   ```
-4. Server responds with **HTTP 500 Internal Server Error**.
+### Acceptance Criteria
 
-### Error Logs / Stack Trace
+- A new user record is created after successful signup.
+- Only the following fields are stored:
+  - Username
+  - Hashed password
+  - Created timestamp
+- Duplicate usernames are rejected with an appropriate error message.
+- Passwords are never stored in plain text.
+- The API returns a success response when the account is created successfully.
+- Invalid or incomplete signup requests return appropriate validation errors.
 
-```
-ERROR:    Exception in ASGI application
-Traceback (most recent call last):
-  File "app/main.py", line 63, in project_health
-    return calculate_project_health(project_id)
-  File "app/services/analytics.py", line 42, in calculate_project_health
-    report = _format_report(project, tasks, summary, workloads)
-  File "app/services/analytics.py", line 139, in _format_report
-    assignee_display = task["assignee"].upper()
-AttributeError: 'NoneType' object has no attribute 'upper'
-```
+### Implementation Steps
+
+1. **Add Dependencies** (`requirements.txt`):
+   - Add `passlib[bcrypt]>=1.7.0` for secure password hashing
+   - Ensure `sqlalchemy>=1.4.0` is present
+
+2. **Create User Model** (`app/models.py`):
+   - Define `User` class inheriting from `Base`
+   - Fields: `id`, `username` (unique, indexed), `hashed_password`, `created_at`
+   - Username must be unique and indexed for fast lookups
+
+3. **Create User Schemas** (`app/schemas.py`):
+   - `UserCreate`: for signup requests (username, password)
+   - `UserResponse`: for API responses (id, username, created_at)
+   - Validate required fields
+
+4. **Password Hashing Utility** (`app/auth.py` or similar):
+   - Use `passlib` with bcrypt to hash passwords
+   - Provide `get_password_hash()` and `verify_password()` functions
+
+5. **CRUD Operations** (`app/crud.py`):
+   - `create_user()`: create new user with hashed password
+   - `get_user_by_username()`: check for existing usernames
+   - Handle database transactions properly
+
+6. **API Endpoint** (`app/main.py`):
+   - `POST /api/users/` endpoint
+   - Validate input with `UserCreate` schema
+   - Check for duplicate username
+   - Hash password before storing
+   - Return `UserResponse` on success (201 Created)
+   - Return appropriate errors for duplicates (409 Conflict) or validation failures (422 Unprocessable Entity)
+
+7. **Database Migration**:
+   - Create migration script to add `users` table
+   - Ensure table is created with proper indexes and constraints
 
 ### Expected Behaviour
 
-`GET /api/projects/1/health` should return a **200** response with a full
-`ProjectHealth` JSON payload.  Unassigned tasks should display
-**"UNASSIGNED"** (or similar) in the report text instead of crashing.
+```bash
+# Successful signup
+curl -X POST http://localhost:8000/api/users/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "john_doe", "password": "SecurePass123!"}'
 
-### Actual Behaviour
+# Response: 201 Created
+{
+  "id": 1,
+  "username": "john_doe",
+  "created_at": "2026-07-07T18:12:34.567890Z"
+}
 
-Server returns a **500** response.  The `_format_report` function in
-`app/services/analytics.py` calls `.upper()` on `task["assignee"]` without
-checking for `None`.
+# Duplicate username attempt
+curl -X POST http://localhost:8000/api/users/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "john_doe", "password": "AnotherPass456"}'
 
-### Suggested Fix Area
+# Response: 409 Conflict
+{
+  "detail": "Username already exists"
+}
 
-File: `app/services/analytics.py`, function `_format_report`, around line 139.
+# Invalid input
+curl -X POST http://localhost:8000/api/users/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": ""}'
 
-Replace:
-```python
-assignee_display = task["assignee"].upper()
+# Response: 422 Unprocessable Entity
+{
+  "detail": [
+    {
+      "loc": ["body", "password"],
+      "msg": "field required",
+      "type": "value_error.missing"
+    }
+  ]
+}
 ```
-with a null-safe alternative:
-```python
-assignee_display = (task["assignee"] or "Unassigned").upper()
-```
 
-### Additional Notes
+### Security Considerations
 
-There is also a secondary cosmetic issue in `_build_workloads` (same file,
-line ~94): when `task["assignee"]` is `None`, the workload dict uses `None`
-as a key which later gets serialised into the `MemberWorkload` model with
-`member=None`.  The workload aggregation should map `None` → `"Unassigned"`
-as well.
+- Passwords must NEVER be stored in plain text
+- Use bcrypt with appropriate work factor (default 12 rounds)
+- Usernames should be case-sensitive or normalized consistently
+- Consider rate limiting for signup endpoint (future enhancement)
+- Validate password strength (optional for MVP)
+
+### Files to Modify
+
+1. `requirements.txt` - Add password hashing library
+2. `app/models.py` - Add User model
+3. `app/schemas.py` - Add UserCreate and UserResponse schemas
+4. `app/auth.py` - Create password hashing utilities (new file)
+5. `app/crud.py` - Add user CRUD operations (new file or extend existing)
+6. `app/main.py` - Add POST /api/users/ endpoint
+7. `app/database.py` - Ensure Base and get_db are properly configured
+8. Migration script - Create users table
 
 ---
 
 ## CLI Command to Run the Agent
 
 ```bash
-python -m jira_resolver_mcp TASKFLOW-142 \
-    --description "GET /api/projects/{id}/health returns 500 — AttributeError: 'NoneType' object has no attribute 'upper' in app/services/analytics.py line 139. Reproduction: curl http://localhost:8000/api/projects/1/health on project with unassigned tasks (assignee=null). Stack trace: File app/services/analytics.py, line 139, in _format_report assignee_display = task['assignee'].upper(). Environment: Python 3.11, FastAPI 0.110, Ubuntu 22.04."
+python -m jira_resolver_mcp TASKFLOW-143 \
+    --description "Implement user signup endpoint POST /api/users/ with username uniqueness check, bcrypt password hashing, and basic user record creation. Requirements: Store username, hashed_password, created_at. Return 201 on success, 409 for duplicate username, 422 for validation errors. Files: app/models.py (User model), app/schemas.py (UserCreate, UserResponse), app/auth.py (password hashing), app/crud.py (user operations), app/main.py (endpoint), requirements.txt (add passlib[bcrypt]). Environment: Python 3.11, FastAPI 0.110, SQLAlchemy, Ubuntu 22.04."
 ```
 
-This description is engineered so that every agent in the pipeline has what
-it needs:
+This description provides complete context for the agent pipeline:
 
 | Agent | What it extracts |
 |-------|-----------------|
-| **Ticket Agent** | ✅ Logs/stack trace present → passes completeness check. Extracts hints: `app/services/analytics.py`, `app/main.py` |
-| **Navigator Agent** | Hints lead to `sample_app` repo; `search_code_across_repos("app/services/analytics.py _format_report assignee")` narrows to the correct file |
-| **Implementer Agent** | Clear description of what line to change and the expected fix pattern |
-| **Reviewer Agent** | Patch should replace `.upper()` with `(... or "Unassigned").upper()` — passes review |
-| **Human Approval** | Diff is small and reviewable |
-| **GitHub Ops** | Creates branch `jira/TASKFLOW-142-*`, applies patch, opens PR |
+| **Ticket Agent** | ✅ Complete feature requirements with acceptance criteria. Extracts hints: `app/models.py`, `app/schemas.py`, `app/auth.py`, `app/crud.py`, `app/main.py`, `requirements.txt` |
+| **Navigator Agent** | Hints lead to correct files in `sample_app` repo; identifies new files to create and existing files to modify |
+| **Implementer Agent** | Clear specifications for each file change: model structure, schema definitions, endpoint logic, security requirements |
+| **Reviewer Agent** | Can verify password hashing is used, unique constraint exists, proper HTTP status codes returned |
+| **Human Approval** | Feature implementation is reviewable with clear acceptance criteria |
+| **GitHub Ops** | Creates branch `jira/TASKFLOW-143-*`, applies changes, opens PR |
