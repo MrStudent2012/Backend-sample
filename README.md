@@ -18,6 +18,7 @@ Open **http://localhost:8000/docs** for the interactive Swagger UI.
 |--------|------|-------------|
 | GET | `/` | Service info |
 | GET | `/health` | Health check |
+| POST | `/api/users/` | User signup |
 | GET | `/api/projects/` | List all projects |
 | POST | `/api/projects/` | Create a project |
 | GET | `/api/projects/{id}` | Get project details |
@@ -29,6 +30,22 @@ Open **http://localhost:8000/docs** for the interactive Swagger UI.
 | PATCH | `/api/tasks/{id}` | Update a task |
 | DELETE | `/api/tasks/{id}` | Delete a task |
 | GET | `/api/projects/{id}/health` | **Project health report** |
+
+## User Signup
+
+To create a new user account:
+
+```bash
+curl -X POST http://localhost:8000/api/users/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "newuser", "password": "securepassword123"}'
+```
+
+Features:
+- Unique username enforcement
+- Secure password hashing (bcrypt)
+- Automatic timestamp tracking
+- Input validation
 
 ## Deploy to Render
 
